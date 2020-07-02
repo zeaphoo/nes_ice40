@@ -1,0 +1,10 @@
+*.asc
+*.blif
+*.swp
+*.json
+*.o
+*.oo
+*.nes
+*.bin
+*.log
+*.rpt

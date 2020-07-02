@@ -1,1 +1,1 @@
-# nes_ice40
+# Port of the MIST NES core to ice40
