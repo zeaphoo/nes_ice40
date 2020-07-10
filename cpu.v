@@ -52,7 +52,7 @@ module NewAlu(input  [10:0] OP, // ALU Operation
   wire [2:0] o_first_op, o_second_op;
   wire o_fc;
   assign {o_left_input, o_right_input, o_first_op, o_second_op, o_fc} = OP;
-  
+
   // Determine left, right inputs to Add/Sub ALU.
   reg [7:0] L, R;
   reg CR;
@@ -105,7 +105,7 @@ module NewAlu(input  [10:0] OP, // ALU Operation
 endmodule
 
 module AddressGenerator(input clk, input ce,
-                        input [4:0] Operation, 
+                        input [4:0] Operation,
                         input [1:0] MuxCtrl,
                         input [7:0] DataBus, T, X, Y,
                         output [15:0] AX,
@@ -122,11 +122,11 @@ module AddressGenerator(input clk, input ce,
   // Possible new value for AL.
   wire [7:0] NewAL;
   assign {Carry,NewAL} = {1'b0, (MuxCtrl[1] ? T : AL)} + {1'b0, (MuxCtrl[0] ? Y : X)};
-  
+
   // The other one
   wire TmpVal = (!AHCtrl[1] | SavedCarry);
   wire [7:0] TmpAdd = (AHCtrl[1] ? AH : AL) + {7'b0, TmpVal};
-  
+
   always @(posedge clk) if (ce) begin
     SavedCarry <= Carry;
     if (ALCtrl[2])
@@ -136,7 +136,7 @@ module AddressGenerator(input clk, input ce,
       2: AL <= TmpAdd;
       3: AL <= T;
       endcase
-     
+
     case(AHCtrl[1:0])
     0: AH <= AH;
     1: AH <= 0;
@@ -157,16 +157,16 @@ module ProgramCounter(input clk, input ce,
 
   always begin
     // Load PC Control
-    case (LoadPC) 
+    case (LoadPC)
     0,1: NewPC = PC + {15'b0, (LoadPC[0] & ~GotInterrupt)};
     2:   NewPC = {DIN,T};
     3:   NewPC = PC + {{8{T[7]}},T};
     endcase
   end
-  
+
   always @(posedge clk)
     if (ce)
-      PC <= NewPC;    
+      PC <= NewPC;
 endmodule
 
 
@@ -182,7 +182,7 @@ module CPU(input clk, input ce, input reset,
   reg [7:0] IR;
   reg [2:0] State;
   reg GotInterrupt;
-  
+
   reg IsResetInterrupt;
   wire [15:0] PC;
   reg JumpTaken;
@@ -194,7 +194,7 @@ module CPU(input clk, input ce, input reset,
   wire [1:0] LoadPC = MicroCode[3:2];            // 12 LUT
   wire [1:0] AddrBus = MicroCode[5:4];           // 18 LUT
   wire [2:0] MemWrite = MicroCode[8:6];          // 10 LUT
-  wire [4:0] AddrCtrl = MicroCode[13:9];       
+  wire [4:0] AddrCtrl = MicroCode[13:9];
   wire       FlagCtrl = MicroCode[14];           // RegWrite + FlagCtrl = 22 LUT
   wire [1:0] LoadT = MicroCode[16:15];           // 13 LUT
   wire [1:0] StateCtrl = MicroCode[18:17];
@@ -285,10 +285,10 @@ always begin
   // nmi vector FFFA
   // Reset vector FFFC
   3: aout = {13'b1111_1111_1111_1, !IsNMIInterrupt, !IsResetInterrupt, ~State[0]};
-  endcase 
+  endcase
 end
 
- 
+
 always @(posedge clk) begin
   if (reset) begin
     // Reset runs the BRK instruction as usual.
@@ -300,14 +300,14 @@ always @(posedge clk) begin
     SP <= 0;
     T <= 0;
     JumpTaken <= 0;
-  end else if (ce) begin      
+  end else if (ce) begin
     // Stack pointer control.
     // The operand is an optimization that either
-    // returns -1,0,1 depending on LoadSP 
+    // returns -1,0,1 depending on LoadSP
     case (LoadSP)
     0,2,3: SP <= SP + { {7{LoadSP[0]}}, LoadSP[1] };
     1: SP <= X;
-    endcase 
+    endcase
 
     // LoadT control
     case (LoadT)
@@ -342,7 +342,7 @@ always @(posedge clk) begin
     6: JumpTaken <= ~P[1]; // BNE
     7: JumpTaken <=  P[1]; // BEQ
     endcase
-    
+
     // Check the interrupt status on the last cycle of the current instruction,
     // (or on cycle #1 of any branch instruction)
     if (StateCtrl == 2'b10) begin

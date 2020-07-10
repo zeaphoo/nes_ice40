@@ -20,7 +20,7 @@
 
 === DMC State Machine ===
 
-// 
+//
 if (dmc_state == 0 && dmc_trigger && cpu_read && !odd_cycle) dmc_state <= 1;
 if (dmc_state == 1) dmc_state <= (spr_state[1] ? 3 : 2);
 pause_cpu = dmc_state[1] && cpu_read;
@@ -64,13 +64,13 @@ module DmaController(input clk, input ce, input reset,
   wire [8:0] new_sprite_dma_addr = sprite_dma_addr[7:0] + 8'h01;
   always @(posedge clk) if (reset) begin
     dmc_state <= 0;
-    spr_state <= 0;    
+    spr_state <= 0;
     sprite_dma_lastval <= 0;
     sprite_dma_addr <= 0;
   end else if (ce) begin
     if (dmc_state == 0 && dmc_trigger && cpu_read && !odd_cycle) dmc_state <= 1;
     if (dmc_state == 1 && !odd_cycle) dmc_state <= 0;
-    
+
     if (sprite_trigger) begin sprite_dma_addr <= {data_from_cpu, 8'h00}; spr_state <= 1; end
     if (spr_state == 1 && cpu_read && odd_cycle) spr_state <= 3;
     if (spr_state[1] && !odd_cycle && dmc_state == 1) spr_state <= 1;
@@ -129,10 +129,10 @@ module NES(input clk, input reset, input ce,
            output [5:0] color,  // pixel generated from PPU
            output joypad_strobe,// Set to 1 to strobe joypads. Then set to zero to keep the value.
            output [1:0] joypad_clock, // Set to 1 for each joypad to clock it.
-           input [3:0] joypad_data, // Data for each joypad + 1 powerpad.
+           input [1:0] joypad_data, // Data for each joypad + 1 powerpad.
            input [4:0] audio_channels, // Enabled audio channels
 
-           
+
            // Access signals for the SRAM.
            output [21:0] memory_addr,   // address to access
            output memory_read_cpu,      // read into CPU latch
@@ -141,14 +141,15 @@ module NES(input clk, input reset, input ce,
            input [7:0] memory_din_ppu,  // next cycle, contents of latch B (PPU's data)
            output memory_write,         // is a write operation
            output [7:0] memory_dout,
-           
+
            output [8:0] cycle,
            output [8:0] scanline,
-           
+
            output reg [31:0] dbgadr,
            output [1:0] dbgctr
            );
   reg [7:0] from_data_bus;
+  reg [7:0] open_bus_data;
   wire [7:0] cpu_dout;
   wire odd_or_even; // Is this an odd or even clock cycle?
 
@@ -198,7 +199,7 @@ module NES(input clk, input reset, input ce,
   wire mr_int      = dma_aout_enable ? dma_read : cpu_mr;
   wire mw_int      = dma_aout_enable ? !dma_read : cpu_mw;
 
-  DmaController dma(clk, apu_ce, reset, 
+  DmaController dma(clk, apu_ce, reset,
                     odd_or_even,                    // Even or odd cycle
                     (addr == 'h4014 && mw_int),     // Sprite trigger
                     apu_dma_request,                // DMC Trigger
@@ -207,18 +208,18 @@ module NES(input clk, input reset, input ce,
                     from_data_bus,                  // Data from RAM etc.
                     apu_dma_addr,                   // DMC addr
                     dma_aout,
-                    dma_aout_enable, 
+                    dma_aout_enable,
                     dma_read,
                     dma_data_to_ram,
                     apu_dma_ack,
                     pause_cpu);
 
-  // -- Audio Processing Unit  
+  // -- Audio Processing Unit
   wire apu_cs = addr >= 'h4000 && addr < 'h4018;
   wire [7:0] apu_dout;
   wire apu_irq;
   APU apu(clk, apu_ce, reset,
-          addr[4:0], dbus, apu_dout, 
+          addr[4:0], dbus, apu_dout,
           mw_int && apu_cs, mr_int && apu_cs,
           audio_channels,
           sample,
@@ -235,7 +236,7 @@ module NES(input clk, input reset, input ce,
   assign joypad_strobe = (joypad1_cs && mw_int && cpu_dout[0]);
   assign joypad_clock =  {joypad2_cs && mr_int, joypad1_cs && mr_int};
 
-      
+
   // -- PPU
   // PPU _reads_ need to happen on the same cycle the cpu runs on, to guarantee we
   // see proper values of register $2002.
@@ -265,12 +266,12 @@ module NES(input clk, input reset, input ce,
   wire cart_ce = (cpu_cycle_counter == 0) && ce;
   wire mapper_irq;
   wire has_chr_from_ppu_mapper;
-  MultiMapper multi_mapper(clk, cart_ce, ce, reset, mapper_ppu_flags, mapper_flags, 
+  MultiMapper multi_mapper(clk, cart_ce, ce, reset, mapper_ppu_flags, mapper_flags,
                            prg_addr, prg_linaddr, prg_read, prg_write, prg_din, prg_dout_mapper, from_data_bus, prg_allow,
                            chr_read, chr_addr, chr_linaddr, chr_from_ppu_mapper, has_chr_from_ppu_mapper, chr_allow, vram_a10, vram_ce, mapper_irq);
   assign chr_to_ppu = has_chr_from_ppu_mapper ? chr_from_ppu_mapper : memory_din_ppu;
-                             
-  // Mapper IRQ seems to be delayed by one PPU clock.   
+
+  // Mapper IRQ seems to be delayed by one PPU clock.
   // APU IRQ seems delayed by one APU clock.
   always @(posedge clk) if (reset) begin
     mapper_irq_delayed <= 0;
@@ -281,22 +282,27 @@ module NES(input clk, input reset, input ce,
     if (apu_ce)
       apu_irq_delayed <= apu_irq;
   end
-   
+
+
+  always @(posedge clk) begin
+    open_bus_data <= from_data_bus;
+  end
+
   // -- Multiplexes CPU and PPU accesses into one single RAM
-  MemoryMultiplex mem(clk, ce, reset, prg_linaddr, prg_read && prg_allow, prg_write && prg_allow, prg_din, 
+  MemoryMultiplex mem(clk, ce, reset, prg_linaddr, prg_read && prg_allow, prg_write && prg_allow, prg_din,
                                chr_linaddr, chr_read,              chr_write && (chr_allow || vram_ce), chr_from_ppu,
                                memory_addr, memory_read_cpu, memory_read_ppu, memory_write, memory_dout);
 
   always @* begin
     if (reset)
-		from_data_bus <= 0;
+		  from_data_bus <= 0;
     else if (apu_cs) begin
       if (joypad1_cs)
-        from_data_bus = {7'b0100000, joypad_data[0]};
+        from_data_bus = {open_bus_data[7:5], 4'b0, joypad_data[0]};
       else if (joypad2_cs)
-        from_data_bus = {3'b010, joypad_data[3:2] ,2'b00, joypad_data[1]};
+        from_data_bus = {open_bus_data[7:5], 4'b0, joypad_data[1]};
       else
-        from_data_bus = apu_dout;
+        from_data_bus = (addr == 16'h4015) ? apu_dout : open_bus_data;
     end else if (ppu_cs) begin
       from_data_bus = ppu_dout;
     end else if (prg_allow) begin
@@ -305,5 +311,5 @@ module NES(input clk, input reset, input ce,
       from_data_bus = prg_dout_mapper;
     end
   end
-  
+
 endmodule

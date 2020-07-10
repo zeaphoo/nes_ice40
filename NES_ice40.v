@@ -21,8 +21,10 @@ module NES_ice40 (
   output           AUDIO_O,
 
   // joystick
-  output joy_strobe, joy_clock,
-  input [3:0] joy_data,
+  output joy_strobe,
+  output [1:0] joy_clock,
+  input joy_data,
+  input joy_data2,
 
   // flashmem
   output flash_sck,
@@ -164,15 +166,20 @@ SB_IO #(
   wire [1:0] dbgctr;
 
   reg joy_data_sync = 0;
-  reg last_joypad_clock;
+  reg joy_data_sync2 = 0;
+  reg [1:0] last_joypad_clock;
 
   always @(posedge clock) begin
     if (joy_strobe) begin
       joy_data_sync <= joy_data;
+      joy_data_sync2 <= joy_data2;
     end
 
-    if (!joy_clock && last_joypad_clock) begin
+    if (!joy_clock[0] && last_joypad_clock[0]) begin
       joy_data_sync <= joy_data;
+    end
+    if (!joy_clock[1] && last_joypad_clock[1]) begin
+      joy_data_sync2 <= joy_data2;
     end
     last_joypad_clock <= joy_clock;
   end
@@ -180,7 +187,7 @@ SB_IO #(
   NES nes(clock, reset_nes, run_nes_g,
           mapper_flags,
           sample, color,
-          joy_strobe, joy_clock, {3'b0,!joy_data_sync},
+          joy_strobe, joy_clock, {!joy_data_sync2, !joy_data_sync},
           5'b11111,  // enable all channels
           memory_addr,
           memory_read_cpu, memory_din_cpu,
